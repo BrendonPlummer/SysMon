@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "simple": {
+      "format": "[%(levelname)s|%(module)s|@%(lineno)d] %(asctime)s: %(message)s",
+      "datefmt": "%Y-%m-%dT%H:%M:%S%z"
+    },
+    "json": {
+      "()": "logger.etl_logger.etl_json_formatter",
+      "fmt_keys": {
+        "level": "levelname",
+        "log_name": "name",
+        "timestamp": "timestamp",
+        "message": "message",
+        "thread_name": "threadName",
+        "module": "module",
+        "function": "funcName",
+        "line": "lineno"
+      }
+    }
+  },
+  "handlers": {
+    "stderr": {
+      "class": "logging.StreamHandler",
+      "level": "INFO",
+      "formatter": "simple",
+      "stream": "ext://sys.stderr"
+    },
+    "json_file": {
+      "class": "logging.handlers.RotatingFileHandler",
+      "level": "DEBUG",
+      "formatter": "json",
+      "filename": "/etc/etl/logs/appliance.log.josnl",
+      "maxBytes": 5000000,
+      "backupCount": 5
+    },
+    "logger_queue_handler": {
+      "class": "logging.handlers.QueueHandler",
+      "handlers": ["stderr", "json_file"],
+      "respect_handler_level": true
+    }
+  },
+  "loggers": {
+    "root": {
+      "level": "DEBUG",
+      "handlers": ["logger_queue_handler"]
+    }
+  }
+}
