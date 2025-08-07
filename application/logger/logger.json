@@ -7,7 +7,7 @@
       "datefmt": "%Y-%m-%dT%H:%M:%S%z"
     },
     "json": {
-      "()": "logger.etl_logger.etl_json_formatter",
+      "()": "application.logger.logger.json_formatter",
       "fmt_keys": {
         "level": "levelname",
         "log_name": "name",

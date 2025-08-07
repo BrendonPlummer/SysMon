@@ -3,7 +3,7 @@ import logging
 import threading
 import typing
 
-from logger.logger import setup_logger
+from application.logger.logger import setup_logger
 
 setup_logger()
 application_logger = logging.getLogger("application")

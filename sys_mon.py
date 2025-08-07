@@ -2,6 +2,7 @@
 
 import logging
 import time
+from datetime import datetime
 from signal import SIGINT, signal
 
 import psutil  # pip install psutil
@@ -67,7 +68,7 @@ class SysMon:
         if self.metrics is None:
             return
         #
-        if self.metrics["cpu_usage"] > CPU_USAGE_PERCENT:
+        if self.metrics["system_info"]["cpu_usage"] > CPU_USAGE_PERCENT:
             sysmon_logger.warning(
                 f"ALERT: CPU usage ({self.metrics['cpu_usage']}%) exceeds threshold of {CPU_USAGE_PERCENT}%"
             )
@@ -77,10 +78,11 @@ class SysMon:
                 f"ALERT: Memory usage ({self.metrics['memory_usage']['percent']}%) exceeds threshold of {MEMORY_USAGE_PERCENT}%"
             )
         #
-        if self.metrics["disk_usage"]["percent"] > DISK_USAGE_PERCENT:
-            sysmon_logger.warning(
-                f"ALERT: Disk usage ({self.metrics['disk_usage']['percent']}%) exceeds threshold of {DISK_USAGE_PERCENT}%"
-            )
+        for disk, disk_data in self.metrics["disk_usage"].items():
+            if disk_data["percent"] > DISK_USAGE_PERCENT:
+                sysmon_logger.warning(
+                    f"ALERT: Disk usage ({self.metrics['disk_usage'][disk]['percent']}%) exceeds threshold of {DISK_USAGE_PERCENT}%"
+                )
 
     def monitor_system_metrics(self) -> None:
         """
@@ -92,36 +94,58 @@ class SysMon:
             - Disk Information
             - Network Information
             - Sensor Information (*If available*)
+
+        /dev/nvme0n1p1  ->  /boot/efi
+        /dev/nvme0n1p2  ->  /
+        /dev/nvme0n1p3  ->  /var
+        /dev/nvme0n1p5  ->  /tmp
+        /dev/nvme0n1p6  ->  /home
         """
         #
         cpu_usage = psutil.cpu_percent(interval=1)
+        cpu_usage_avg = [x / psutil.cpu_count() * 100 for x in psutil.getloadavg()]
         memory_info = psutil.virtual_memory()
-        disk_info = psutil.disk_usage("/")
         net_info = psutil.net_io_counters()
         #
+        disk_info = {}
+        for partition in psutil.disk_partitions():
+            try:
+                disk_usage = psutil.disk_usage(partition.mountpoint)
+                disk_info[partition.device] = {
+                    "total": f"{disk_usage.total / 1024 / 1024 / 1024:.2f} Gb",
+                    "used": f"{disk_usage.used / 1024 / 1024 / 1024:.2f} Gb",
+                    "free": f"{disk_usage.free / 1024 / 1024 / 1024:.2f} Gb",
+                    "percent": disk_usage.percent,
+                    "mountpoint": partition.mountpoint,
+                }
+            #
+            except PermissionError as pe:
+                sysmon_logger.warning(f"Permission Denied: {pe}")
+                continue
+        #
         self.metrics = {
-            "cpu_usage": cpu_usage,
+            "system_info": {
+                "boot_time": datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S"),
+                "cpu_usage": cpu_usage,
+                "cpu_usage_avg": f"{cpu_usage_avg}",
+            },
             "memory_usage": {
                 "percent": memory_info.percent,
                 "used_mb": f"{memory_info.used / 1024 / 1024:.2f}",
                 "total_mb": f"{memory_info.total / 1024 / 1024:.2f}",
             },
-            "disk_usage": {
-                "percent": disk_info.percent,
-                "used_gb": f"{disk_info.used / 1024 / 1024 / 1024:.2f}",
-                "total_gb": f"{disk_info.total / 1024 / 1024 / 1024:.2f}",
-            },
+            "disk_usage": disk_info,
             "net_usage": {
                 "bytes_sent": net_info.bytes_sent,
                 "bytes_received": net_info.bytes_recv,
+                "error_in": net_info.errin,
+                "error_out": net_info.errout,
+                "drop_in": net_info.dropin,
+                "drop_out": net_info.dropout,
             },
         }
         #
-        sysmon_logger.info(
-            f"CPU: {self.metrics['cpu_usage']}% | "
-            f"Memory: {self.metrics['memory_usage']['percent']}% ({self.metrics['memory_usage']['used_mb']}MB / {self.metrics['memory_usage']['total_mb']}MB) | "
-            f"Disk: {self.metrics['disk_usage']['percent']}% ({self.metrics['disk_usage']['used_gb']}GB / {self.metrics['disk_usage']['total_gb']}GB)"
-        )
+        sysmon_logger.info(f"System Metrics: {self.metrics}")
         #
         # Running Processes (Top 5 by memory)
         #
@@ -161,7 +185,7 @@ def main():
     #
     main_module = SysMon(Shareables())
     #
-    app = Application(main_module.__class__.__name__, worker_loop=main_module.run, loop_interval=5)
+    app = Application(main_module.__class__.__name__, worker_loop=main_module.run, loop_interval=20)
     app.start()
     #
     signal(SIGINT, app.signal_handler)
