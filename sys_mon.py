@@ -3,6 +3,7 @@
 import logging
 import time
 from datetime import datetime
+from pprint import pprint
 from signal import SIGINT, signal
 
 import psutil  # pip install psutil
@@ -123,11 +124,56 @@ class SysMon:
                 sysmon_logger.warning(f"Permission Denied: {pe}")
                 continue
         #
+        # Running Processes (Top 5 by memory)
+        #
+        processes = sorted(
+            [
+                p.info
+                for p in psutil.process_iter(["pid", "name", "memory_percent"])
+                if p.info["memory_percent"] is not None
+            ],
+            key=lambda p: p["memory_percent"],
+            reverse=True,
+        )
+        process_data: dict = {}
+        for proc in processes[:5]:
+            proc_entry: dict = {}
+            # sysmon_logger.info(
+            #     f"  - PID: {proc['pid']}, Name: {proc['name']}, Memory: {proc['memory_percent']:.2f}%"
+            # )
+            #
+            proc_entry = {
+                proc["pid"]: [f"Name: {proc['name']}", f"Memory: {proc['memory_percent']:.2f}%"]
+            }
+            process_data.update(proc_entry)
+        #
+        # Sensor Temperatures (if available)
+        #
+        temp_data: dict = {}
+        if hasattr(psutil, "sensors_temperatures"):
+            #
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for name, entries in temps.items():
+                    for entry in entries:
+                        temp_entry: dict = {}
+                        #
+                        temp_entry = {f"{name} - {entry.label}": entry.current}
+                        temp_data.update(temp_entry)
+            else:
+                sysmon_logger.info("Temperature sensors not found.")
+        else:
+            sysmon_logger.info("Temperature monitoring not supported on this system.")
+        #
+        #
+        #
         self.metrics = {
             "system_info": {
                 "boot_time": datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S"),
                 "cpu_usage": cpu_usage,
                 "cpu_usage_avg": f"{cpu_usage_avg}",
+                "temperature_data": temp_data,
+                "top_processes": process_data,
             },
             "memory_usage": {
                 "percent": memory_info.percent,
@@ -146,36 +192,6 @@ class SysMon:
         }
         #
         sysmon_logger.info(f"System Metrics: {self.metrics}")
-        #
-        # Running Processes (Top 5 by memory)
-        #
-        processes = sorted(
-            [
-                p.info
-                for p in psutil.process_iter(["pid", "name", "memory_percent"])
-                if p.info["memory_percent"] is not None
-            ],
-            key=lambda p: p["memory_percent"],
-            reverse=True,
-        )
-        sysmon_logger.info("Top 5 processes by memory:")
-        for proc in processes[:5]:
-            sysmon_logger.info(
-                f"  - PID: {proc['pid']}, Name: {proc['name']}, Memory: {proc['memory_percent']:.2f}%"
-            )
-        #
-        # Sensor Temperatures (if available)
-        #
-        if hasattr(psutil, "sensors_temperatures"):
-            temps = psutil.sensors_temperatures()
-            if temps:
-                for name, entries in temps.items():
-                    for entry in entries:
-                        sysmon_logger.info(f"Temperature - {name} ({entry.label}): {entry.current}°C")
-            else:
-                sysmon_logger.info("Temperature sensors not found.")
-        else:
-            sysmon_logger.info("Temperature monitoring not supported on this system.")
 
 
 def main():
