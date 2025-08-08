@@ -71,8 +71,8 @@ import json
 import logging
 import logging.config
 import pathlib
-import traceback
-from typing import override
+
+# from typing import override
 
 
 # Sets up the root logger
@@ -123,7 +123,7 @@ class json_formatter(logging.Formatter):
         super().__init__()
         self.fmt_keys = fmt_keys if fmt_keys is not None else {}
 
-    @override
+    # @override
     def format(self, record: logging.LogRecord) -> str:
         #
         message = self._prepare_log_dict(record)
@@ -171,6 +171,6 @@ class json_formatter(logging.Formatter):
 
 
 class NonErrorFilter(logging.Filter):
-    @override
+    # @override
     def filter(self, record: logging.LogRecord) -> bool | logging.LogRecord:
         return record.levelno <= logging.INFO

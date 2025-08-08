@@ -1,12 +1,12 @@
 #!/usr/bin/python3 -u
-import logging
+# import logging
 import threading
 import typing
 
-from application.logger.logger import setup_logger
+# from application.logger.logger import setup_logger
 
-setup_logger()
-application_logger = logging.getLogger("application")
+# setup_logger()
+# application_logger = logging.getLogger("application")
 
 
 class Application:
@@ -32,9 +32,9 @@ class Application:
             self.worker_thread = threading.Thread(target=self._loop, name="WorkerThread")
             self.worker_thread.start()
             #
-            application_logger.debug(
-                f"{self.module_name} :: {self.worker_loop.__name__} {self.worker_loop.__name__} :: Starting main worker thread."
-            )
+            # application_logger.debug(
+            #     f"{self.module_name} :: {self.worker_loop.__name__} {self.worker_loop.__name__} :: Starting main worker thread."
+            # )
 
     def stop(self):
         """
@@ -45,9 +45,9 @@ class Application:
             self.shutdown_event.set()
             self.worker_thread.join()
             #
-            application_logger.debug(
-                f"{self.module_name} :: {self.worker_loop.__name__} :: Stopping main worker thread."
-            )
+            # application_logger.debug(
+            #     f"{self.module_name} :: {self.worker_loop.__name__} :: Stopping main worker thread."
+            # )
 
     def _loop(self):
         """
@@ -60,7 +60,8 @@ class Application:
                 self.shutdown_event.wait(self.loop_interval)
             #
             except Exception as e:
-                application_logger.exception(e)
+                # application_logger.exception(e)
+                print(e)
                 self.stop()
                 # raise e  # Raise for Python interpreter to post
 

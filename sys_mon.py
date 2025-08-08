@@ -11,12 +11,14 @@ import psutil  # pip install psutil
 from application.app_threading import Application
 
 # Setup logger
-sysmon_logger = logging.getLogger("application.sys_mon")
+# sysmon_logger = logging.getLogger("application.sys_mon")
 
 # Constants
 CPU_USAGE_PERCENT = 85.0
 MEMORY_USAGE_PERCENT = 80.0
 DISK_USAGE_PERCENT = 90.0
+#
+LOGFILE_PATH = "/etc/etl/logs/system_monitoring.log"
 
 
 class Shareables:
@@ -34,26 +36,15 @@ class SysMon:
     def __init__(self, shareables: Shareables):
         #
         self.shareables = shareables
-        sysmon_logger.info("Finished initialising :: Application.SysMon")
         #
         self.metrics: dict | None = None
-        #
-        # [TODO]: Implement the below configuration
-        #
-        # config = configparser.ConfigParser()
-        # config.read("config.ini")
+        self.log("\n\nStarting new SysMon instance...")
 
-        # # Read settings from config file
-        # loop_interval = config.getint("Settings", "loop_interval", fallback=10)
-        # Thresholds.CPU_USAGE_PERCENT = config.getfloat(
-        #     "Thresholds", "cpu_usage", fallback=85.0
-        # )
-        # Thresholds.MEMORY_USAGE_PERCENT = config.getfloat(
-        #     "Thresholds", "memory_usage", fallback=80.0
-        # )
-        # Thresholds.DISK_USAGE_PERCENT = config.getfloat(
-        #     "Thresholds", "disk_usage", fallback=90.0
-        # )
+    #
+    def log(self, log_dict: dict | str):
+        #
+        with open(LOGFILE_PATH, "a") as logf:
+            print(f"{log_dict}", file=logf)
 
     #
     def run(self):
@@ -70,18 +61,18 @@ class SysMon:
             return
         #
         if self.metrics["system_info"]["cpu_usage"] > CPU_USAGE_PERCENT:
-            sysmon_logger.warning(
+            self.log(
                 f"ALERT: CPU usage ({self.metrics['cpu_usage']}%) exceeds threshold of {CPU_USAGE_PERCENT}%"
             )
         #
         if self.metrics["memory_usage"]["percent"] > MEMORY_USAGE_PERCENT:
-            sysmon_logger.warning(
+            self.log(
                 f"ALERT: Memory usage ({self.metrics['memory_usage']['percent']}%) exceeds threshold of {MEMORY_USAGE_PERCENT}%"
             )
         #
         for disk, disk_data in self.metrics["disk_usage"].items():
             if disk_data["percent"] > DISK_USAGE_PERCENT:
-                sysmon_logger.warning(
+                self.log(
                     f"ALERT: Disk usage ({self.metrics['disk_usage'][disk]['percent']}%) exceeds threshold of {DISK_USAGE_PERCENT}%"
                 )
 
@@ -121,7 +112,7 @@ class SysMon:
                 }
             #
             except PermissionError as pe:
-                sysmon_logger.warning(f"Permission Denied: {pe}")
+                self.log(f"Permission Denied: {pe}")
                 continue
         #
         # Running Processes (Top 5 by memory)
@@ -138,9 +129,6 @@ class SysMon:
         process_data: dict = {}
         for proc in processes[:5]:
             proc_entry: dict = {}
-            # sysmon_logger.info(
-            #     f"  - PID: {proc['pid']}, Name: {proc['name']}, Memory: {proc['memory_percent']:.2f}%"
-            # )
             #
             proc_entry = {
                 proc["pid"]: [f"Name: {proc['name']}", f"Memory: {proc['memory_percent']:.2f}%"]
@@ -161,9 +149,9 @@ class SysMon:
                         temp_entry = {f"{name} - {entry.label}": entry.current}
                         temp_data.update(temp_entry)
             else:
-                sysmon_logger.info("Temperature sensors not found.")
+                self.log("Temperature sensors not found.")
         else:
-            sysmon_logger.info("Temperature monitoring not supported on this system.")
+            self.log("Temperature monitoring not supported on this system.")
         #
         #
         #
@@ -191,7 +179,7 @@ class SysMon:
             },
         }
         #
-        sysmon_logger.info(f"System Metrics: {self.metrics}")
+        self.log(f"System Metrics: {self.metrics}")
 
 
 def main():
@@ -201,7 +189,7 @@ def main():
     #
     main_module = SysMon(Shareables())
     #
-    app = Application(main_module.__class__.__name__, worker_loop=main_module.run, loop_interval=20)
+    app = Application(main_module.__class__.__name__, worker_loop=main_module.run, loop_interval=300)
     app.start()
     #
     signal(SIGINT, app.signal_handler)
